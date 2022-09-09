@@ -1,0 +1,961 @@
+(function() {
+  'use strict';
+
+  // map viewport dimensions
+  var width = 460,
+    height = 450;
+
+// var legendText = ["Amuriat","Kabuleta","Kalembe","Katumba",
+// "Kyagulanyi","Mao","Mayambala","Mugisha",
+// "Mwesigye","Tumukunde","Museveni", "InvalidVotes"];
+
+  // create a scale of colours for each party, so we can map results to district segments
+  var quantize = d3.scale.quantize()
+    .domain([1, 11])
+    .range(d3.range(11).map(function(i) {
+      return "f" + i;
+    }));
+
+  // set up map projection, and position it.
+  var projection = d3.geo.albers()
+  projection.center([38.2, 0.4])
+    .rotate([0, 11.5, -16.4])
+    .parallels([25, 35])
+    .scale(3500);
+  var path = d3.geo.path().projection(projection);
+
+  // add d3 zoom behaviour to map container.
+  var zoom = d3.behavior.zoom()
+    .scaleExtent([1, 10])
+    .on("zoom", zoomed);
+
+  // set up SVG, viewport and clipping mask for map
+  var svg = d3.select('#electionMap')
+    .append('svg:svg')
+    .attr('width', width)
+    .attr('height', height)
+    .attr('viewBox', '0 0 ' + width + ' ' + height)
+    .attr('perserveAspectRatio', 'xMinYMid')
+    .attr('id', "sizer-map")
+    .attr('class', "sizer")
+    .call(zoom);
+  var main = svg.append("g")
+    .attr('transform', 'translate(0,0)')
+    .attr('width', width)
+    .attr('height', height)
+    .attr('class', 'main');
+  var rect = svg.append("rect")
+    .attr("width", width)
+    .attr("height", height)
+    .attr("class", "overlay")
+    .style("fill", "none")
+    .style("pointer-events", "all");
+  var mapContainer = svg.append("g");
+  var tooltip = d3.select("#tooltipContainer")
+    .append("div")
+    .attr("class", "tooltip");
+  tooltip.html(" ");
+
+  // Barchart
+  var barchart = d3.select("#tooltipContainer")
+    .append("div")
+    .attr("class", "charty")
+    .style("opacity", 0)
+    .style("height", 0);
+
+
+
+    // var piechart = d3.select("#piechartsvg")
+    //   .append("div")
+    //   .attr("class", "charty")
+    //   .style("opacity", 0)
+    //   .style("height", 0);
+
+  //Width and height of barchart
+  var w = 260,
+    h = 200,
+    barPadding = 1;
+
+  //Create bar chart
+  var barsvg = barchart
+    .append("svg")
+    .attr("width", w)
+    .attr("height", h)
+    .attr('viewBox', '0 0 ' + w + ' ' + h)
+    .attr('perserveAspectRatio', 'xMinYMid')
+    .attr('id', "sizer-result")
+    .attr('class', "sizer");
+
+    // var piesvg = piechart
+    //   .append("svg")
+    //   .attr("width", w)
+    //   .attr("height", h)
+    //   .attr('viewBox', '0 0 ' + w + ' ' + h)
+    //   .attr('perserveAspectRatio', 'xMinYMid')
+    //   .attr('id', "sizer-result")
+    //   .attr('class', "sizer");
+
+
+
+  // use queue function to load map and results data asynchronously, then call ready function when done.
+  queue()
+    .defer(d3.json, "map.json")
+    .defer(d3.json, "election-data3.json")
+
+
+    .await(ready);
+
+  var ug, mapFeatures, boundaries, district;
+
+  function ready(error, ug, boundaries) {
+    mapFeatures = topojson.feature(ug, ug.objects.subunits).features;
+    var map = mapContainer.append("g").attr("class", "subunits").selectAll("path").data(mapFeatures),
+    district = boundaries.data,
+    legend,
+    content,
+    amuriatCount=0,
+    kabuletaCount=0,
+    kalembeCount=0,
+    katumbaCount=0,
+    kyagulanyiCount=0,
+    maoCount=0,
+    mayambalaCount=0,
+    mugishaCount=0,
+    mwesigyeCount=0,
+    tumukundeCount=0,
+    museveniCount=0,
+    //ValidVotesCount=0,
+    invalidVotesCount=0;
+
+    // count number of constituencies won by each party
+    for (var i = 0; i < district.length; i++) {
+      if (district[i].winner == 'Amuriat') {
+        amuriatCount++;
+      } else if (district[i].winner == 'Kabuleta') {
+        kabuletaCount++;
+      } else if (district[i].winner == 'Kalembe') {
+        kalembeCount++;
+      } else if (district[i].winner == 'Katumba') {
+        katumbaCount++;
+      } else if (district[i].winner == 'Kyagulanyi') {
+        kyagulanyiCount++;
+      } else if (district[i].winner == 'Mao') {
+        maoCount++;
+      } else if (district[i].winner == 'Mayambala') {
+        mayambalaCount++;
+      } else if (district[i].winner == 'Mugisha') {
+        mugishaCount++;
+      }
+      else if (district[i].winner == 'Mwesigye') {
+       mwesigyeCount++;
+     }
+     else if (district[i].winner == 'Tumukunde') {
+      tumukundeCount++;
+    }
+    else if (district[i].winner == 'Museveni') {
+     museveniCount++;
+   } else {
+        invalidVotesCount++;
+      }
+    }
+
+    // count number of constituencies won by each party
+
+
+    // make legend
+    var color = d3.scale.ordinal().range(["#0000FF", "#964B00", "#FFFFFF", "#808000", "#FF0000", "#008000", "#008080", "#800080",
+    "#CCCCFF","#FFA500","#ffff9d", "gray"]);
+    color.domain(["Amuriat","Kabuleta","Kalembe","Katumba",
+"Kyagulanyi","Mao","Mayambala","Mugisha",
+"Mwesigye","Tumukunde","Museveni", "InvalidVotes"]);
+
+
+
+    map.enter()
+      .append("path")
+      .attr("class", function(d, i) {
+        var badge = "f0";
+        if (typeof district[d.properties.id - 1] === "undefined") {
+          badge = "f0";
+        } else {
+
+            badge = "f" + district[d.properties.id - 1].colour;
+
+        }
+        return "ward ward-" + d.properties.id + " " + badge;
+      })
+      .attr("d", path);
+
+      map.on("mousemove", function(d,i){
+        tooltip.style("opacity", 1);
+        if (district[d.properties.id - 1].winner != "0") {
+          d3.select(".charty").style("opacity", 1).style("height", "auto");
+          content = "<h2>" + district[d.properties.id - 1].district + "</h2>" +
+            "<p><strong class='f" + district[d.properties.id - 1].colour + "'>" +
+
+          (  "Won")
+
+            + " by " +
+
+            (
+             district[d.properties.id - 1].winner
+           )  + "</strong>" + "<br/><span>Votes:</span> <strong>" + district[d.properties.id - 1].TotalVotes + "</strong></p>";
+
+
+          tooltip.html(content);
+
+          var partyData = [{
+            "party": "Amuriat",
+            "result": parseInt(district[d.properties.id - 1].Amuriat)
+          }, {
+            "party": "Kabuleta",
+            "result": parseInt(district[d.properties.id - 1].Kabuleta)
+          }, {
+            "party": "Kalembe",
+            "result": parseInt(district[d.properties.id - 1].Kalembe)
+          }, {
+            "party": "Katumba",
+            "result": parseInt(district[d.properties.id - 1].Katumba)
+          }, {
+            "party": "Kyagulanyi",
+            "result": parseInt(district[d.properties.id - 1].Kyagulanyi)
+          }, {
+            "party": "Mao",
+            "result": parseInt(district[d.properties.id - 1].Mao)
+          }, {
+            "party": "Mayambala",
+            "result": parseInt(district[d.properties.id - 1].Mayambala)
+          }, {
+            "party": "Mugisha",
+            "result": parseInt(district[d.properties.id - 1].Mugisha)
+          }, {
+            "party": "Mwesigye",
+            "result": parseInt(district[d.properties.id - 1].Mwesigye)
+          }, {
+            "party": "Tumukunde",
+            "result": parseInt(district[d.properties.id - 1].Tumukunde)
+          }, {
+            "party": "Museveni",
+            "result": parseInt(district[d.properties.id - 1].Museveni)
+          }];
+
+
+
+          partyData.push({
+            "party": "InvalidVotes",
+            "result": parseInt(district[d.properties.id - 1].InvalidVotes)
+          });
+
+          var SortByResult = function(x, y) {
+            return y.result - x.result;
+          };
+
+          var max = d3.max(partyData, function(d) {
+            return d.result;
+          });
+
+          var barx = d3.scale.linear().domain([0, max]).range([0, 160]);
+          //var piex = d3.scale.linear().domain([0, max]).range([0, 160]);
+          var winner = district[d.properties.id - 1].colour;
+
+          barsvg.attr("width", w).attr("height", h).selectAll("rect")
+            .data(partyData.sort(SortByResult).filter(function(d) {
+              return d.result !== 0;
+            }))
+            .enter()
+            .append("rect")
+            .attr("x", 100)
+            .attr("y", function(d, i) {
+              return i * (h / partyData.length);
+            })
+            .attr("width", function(d, i) {
+              return barx(d.result);
+            })
+            .attr("height", h / partyData.length - barPadding)
+            .attr("class", function(d, i) {
+              if (i < 1) {
+                return "f" + winner;
+              } else {
+                return "lightbar";
+              }
+            });
+
+
+                      var votesData = [{
+                        "party": "Invalid Votes",
+                        "result": parseInt(district[d.properties.id - 1].InvalidVotes)
+                      }, {
+                        "party": "ValidV otes",
+                        "result": parseInt(district[d.properties.id - 1].ValidVotes)
+                      }, {
+                        "party": "Total Votes",
+                        "result": parseInt(district[d.properties.id - 1].TotalVotes)
+                      }];
+
+          barsvg.selectAll("text")
+            .data(partyData.sort(SortByResult).filter(function(d) {
+              return d.result !== 0;
+            }))
+            .enter()
+            .append("text")
+            .text(function(d) {
+              return d.party + ": " + d.result;
+            })
+            .attr("text-anchor", "left")
+            .attr("x", function(d) {
+              return 1;
+            })
+            .attr("y", function(d, i) {
+              return i * (h / partyData.length - barPadding) + 20;
+            })
+            .attr("font-family", "Arial, Helvetica, sans-serif")
+            .attr("font-size", "12px")
+            .attr("fill", "black");
+          }
+
+        // } else {
+        //   content = "<h2>" + district[d.properties.id - 1].district + "</h2>" + "<p><strong>Previously held by " + ((district[d.properties.id - 1].previous_winner == "Liberal Democrat" || district[d.properties.id - 1].previous_winner == "Conservative") ? district[d.properties.id - 1].previous_winner + "s" : district[d.properties.id - 1].previous_winner) + "</strong></p>";
+        //   d3.select(".charty").style("opacity", 0);
+        //   tooltip.html(content);
+        // }
+        var badge = "f0";
+        if (!isNaN(district[d.properties.id - 1].colour)) {
+
+            badge = "f" + district[d.properties.id - 1].colour;
+
+        }
+        d3.select("#tooltipContainer h2").attr("class", badge);
+      })
+      .on("mouseout", function(d) {
+       tooltip.html(" ");
+       d3.select(".charty").style("height", 0);
+       barsvg.attr("width", 0).attr("height", 0);
+       barsvg.selectAll("rect,text").remove();
+     });
+
+  }
+
+  function zoomed() {
+    var t = d3.event.translate,
+      s = d3.event.scale;
+    t[0] = Math.min(width / 2 * (s - 1), Math.max(width / 2 * (1 - s) - 150 * s, t[0]));
+    t[1] = Math.min(height / 2 * (s - 1) + 230 * s, Math.max(height / 2 * (1 - s) - 230 * s, t[1]));
+    zoom.translate(t);
+    mapContainer.style("stroke-width", 1 / s).attr("transform", "translate(" + t + ")scale(" + s + ")");
+  }
+
+
+}());
+
+
+
+(function(){
+  var width = 260;
+        var height =260;
+        var radius = Math.min(width, height) / 2;
+        var donutWidth = 89;
+        var legendRectSize = 11;
+        var legendSpacing = 2;
+
+//        var color = d3.scale.category20b();
+
+		    var color = d3.scale.ordinal().range(["#0000FF", "#964B00", "#FFFFFF", "#808000", "#FF0000", "#008000", "#008080", "#800080",
+    "#CCCCFF","#FFA500","#ffff9d", "gray"]);
+    color.domain(["Amuriat","Kabuleta","Kalembe","Katumba",
+"Kyagulanyi","Mao","Mayambala","Mugisha",
+"Mwesigye","Tumukunde","Museveni", "InvalidVotes"]);
+
+        var svg = d3.select('#piechartsvg')
+          .append('svg')
+          .attr('width', width)
+          .attr('height', height)
+          .append('g')
+          .attr('transform', 'translate(' + (width / 2) +
+            ',' + (height / 2) + ')');
+
+        var arc = d3.svg.arc()
+          .innerRadius(donutWidth)
+          .outerRadius(radius);
+
+        var pie = d3.layout.pie()
+          .value(function(d) { return d.count; })
+          ;
+
+        var tooltip = d3.select('#piechartsvg')
+          .append('div')
+          .attr('class', 'tooltip');
+
+        tooltip.append('div')
+          .attr('class', 'label');
+
+        tooltip.append('div')
+          .attr('class', 'count');
+
+        tooltip.append('div')
+          .attr('class', 'percent');
+
+        d3.csv('weekdays1.csv', function(error, dataset) {
+          dataset.forEach(function(d) {
+            d.count = +d.count;
+            d.enabled = true;                                         // NEW
+          });
+
+          var path = svg.selectAll('path')
+            .data(pie(dataset))
+            .enter()
+            .append('path')
+            .attr('d', arc)
+            .attr('fill', function(d, i) {
+              return color(d.data.label);
+            })                                                        // UPDATED (removed semicolon)
+            .each(function(d) { this._current = d; });                // NEW
+
+          path.on('mouseover', function(d) {
+            var total = d3.sum(dataset.map(function(d) {
+              return (d.enabled) ? d.count : 0;                       // UPDATED
+            }));
+            var percent = Math.round(1000 * d.data.count / total) / 10;
+            //var votesdisplay = Math.round(1000 * d.data.count / total) / 10;
+
+            //var votesdisplay = parseInt($(#d.data.count.text());
+
+
+
+            tooltip.select('.label').html(d.data.label);
+            tooltip.select('.count').html(d.data.count.toLocaleString());
+            tooltip.select('.percent').html(percent + '%');
+            tooltip.style('display', 'block');
+          });
+
+          path.on('mouseout', function() {
+            tooltip.style('display', 'none');
+          });
+
+          /* OPTIONAL
+          path.on('mousemove', function(d) {
+            tooltip.style('top', (d3.event.layerY + 10) + 'px')
+              .style('left', (d3.event.layerX + 10) + 'px');
+          });
+          */
+
+          var legend = svg.selectAll('.legend')
+		  .data(color.domain())
+            .enter()
+            .append('g')
+            .attr('class', 'legend')
+            .attr('transform', function(d, i) {
+              var height = legendRectSize + legendSpacing;
+              var offset =  height * color.domain().length / 2;
+              var horz = -2 * legendRectSize;
+              var vert = i * height - offset;
+              return 'translate(' + horz + ',' + vert + ')';
+            });
+
+          legend.append('rect')
+            .attr('width', legendRectSize)
+            .attr('height', legendRectSize)
+            .style('fill', color)
+            .style('stroke', color)                                   // UPDATED (removed semicolon)
+            .on('click', function(label) {                            // NEW
+              var rect = d3.select(this);                             // NEW
+              var enabled = true;                                     // NEW
+              var totalEnabled = d3.sum(dataset.map(function(d) {     // NEW
+                return (d.enabled) ? 1 : 0;                           // NEW
+              }));                                                    // NEW
+
+              if (rect.attr('class') === 'disabled') {                // NEW
+                rect.attr('class', '');                               // NEW
+              } else {                                                // NEW
+                if (totalEnabled < 2) return;                         // NEW
+                rect.attr('class', 'disabled');                       // NEW
+                enabled = false;                                      // NEW
+              }                                                       // NEW
+
+              pie.value(function(d) {                                 // NEW
+                if (d.label === label) d.enabled = enabled;           // NEW
+                return (d.enabled) ? d.count : 0;                     // NEW
+              });                                                     // NEW
+
+              path = path.data(pie(dataset));                         // NEW
+
+              path.transition()                                       // NEW
+                .duration(750)                                        // NEW
+                .attrTween('d', function(d) {                         // NEW
+                  var interpolate = d3.interpolate(this._current, d); // NEW
+                  this._current = interpolate(0);                     // NEW
+                  return function(t) {                                // NEW
+                    return arc(interpolate(t));                       // NEW
+                  };                                                  // NEW
+                });                                                   // NEW
+            });                                                       // NEW
+
+          legend.append('text')
+            .attr('x', legendRectSize + legendSpacing)
+            .attr('y', legendRectSize - legendSpacing)
+            .text(function(d) { return d; });
+
+        });
+
+}());
+
+
+(function(){
+  var width = 260;
+        var height =260;
+        var radius = Math.min(width, height) / 2;
+        var donutWidth = 89;
+        var legendRectSize = 11;
+        var legendSpacing = 2;
+
+//        var color = d3.scale.category20b();
+
+		    var color = d3.scale.ordinal().range(["#0000FF", "#964B00", "#FFFFFF", "#808000", "#FF0000", "#008000", "#008080", "#800080",
+    "#CCCCFF","#FFA500","#ffff9d", "gray"]);
+    color.domain(["Amuriat","Kabuleta","Kalembe","Katumba",
+"Kyagulanyi","Mao","Mayambala","Mugisha",
+"Mwesigye","Tumukunde","Museveni", "InvalidVotes"]);
+
+        var svg = d3.select('#anotherchart')
+          .append('svg')
+          .attr('width', width)
+          .attr('height', height)
+          .append('g')
+          .attr('transform', 'translate(' + (width / 2) +
+            ',' + (height / 2) + ')');
+
+        var arc = d3.svg.arc()
+          .innerRadius(donutWidth)
+          .outerRadius(radius);
+
+        var pie = d3.layout.pie()
+          .value(function(d) { return d.count; })
+          ;
+
+        var tooltip = d3.select('#anotherchart')
+          .append('div')
+          .attr('class', 'tooltip');
+
+        tooltip.append('div')
+          .attr('class', 'label');
+
+        tooltip.append('div')
+          .attr('class', 'count');
+
+        tooltip.append('div')
+          .attr('class', 'percent');
+
+        d3.csv('weekdays1.csv', function(error, dataset) {
+          dataset.forEach(function(d) {
+            d.count = +d.count;
+            d.enabled = true;                                         // NEW
+          });
+
+          var path = svg.selectAll('path')
+            .data(pie(dataset))
+            .enter()
+            .append('path')
+            .attr('d', arc)
+            .attr('fill', function(d, i) {
+              return color(d.data.label);
+            })                                                        // UPDATED (removed semicolon)
+            .each(function(d) { this._current = d; });                // NEW
+
+          path.on('mouseover', function(d) {
+            var total = d3.sum(dataset.map(function(d) {
+              return (d.enabled) ? d.count : 0;                       // UPDATED
+            }));
+            var percent = Math.round(1000 * d.data.count / total) / 10;
+            //var votesdisplay = Math.round(1000 * d.data.count / total) / 10;
+
+            //var votesdisplay = parseInt($(#d.data.count.text());
+
+
+
+            tooltip.select('.label').html(d.data.label);
+            tooltip.select('.count').html(d.data.count.toLocaleString());
+            tooltip.select('.percent').html(percent + '%');
+            tooltip.style('display', 'block');
+          });
+
+          path.on('mouseout', function() {
+            tooltip.style('display', 'none');
+          });
+
+          /* OPTIONAL
+          path.on('mousemove', function(d) {
+            tooltip.style('top', (d3.event.layerY + 10) + 'px')
+              .style('left', (d3.event.layerX + 10) + 'px');
+          });
+          */
+
+          var legend = svg.selectAll('.legend')
+		  .data(color.domain())
+            .enter()
+            .append('g')
+            .attr('class', 'legend')
+            .attr('transform', function(d, i) {
+              var height = legendRectSize + legendSpacing;
+              var offset =  height * color.domain().length / 2;
+              var horz = -2 * legendRectSize;
+              var vert = i * height - offset;
+              return 'translate(' + horz + ',' + vert + ')';
+            });
+
+          legend.append('rect')
+            .attr('width', legendRectSize)
+            .attr('height', legendRectSize)
+            .style('fill', color)
+            .style('stroke', color)                                   // UPDATED (removed semicolon)
+            .on('click', function(label) {                            // NEW
+              var rect = d3.select(this);                             // NEW
+              var enabled = true;                                     // NEW
+              var totalEnabled = d3.sum(dataset.map(function(d) {     // NEW
+                return (d.enabled) ? 1 : 0;                           // NEW
+              }));                                                    // NEW
+
+              if (rect.attr('class') === 'disabled') {                // NEW
+                rect.attr('class', '');                               // NEW
+              } else {                                                // NEW
+                if (totalEnabled < 2) return;                         // NEW
+                rect.attr('class', 'disabled');                       // NEW
+                enabled = false;                                      // NEW
+              }                                                       // NEW
+
+              pie.value(function(d) {                                 // NEW
+                if (d.label === label) d.enabled = enabled;           // NEW
+                return (d.enabled) ? d.count : 0;                     // NEW
+              });                                                     // NEW
+
+              path = path.data(pie(dataset));                         // NEW
+
+              path.transition()                                       // NEW
+                .duration(750)                                        // NEW
+                .attrTween('d', function(d) {                         // NEW
+                  var interpolate = d3.interpolate(this._current, d); // NEW
+                  this._current = interpolate(0);                     // NEW
+                  return function(t) {                                // NEW
+                    return arc(interpolate(t));                       // NEW
+                  };                                                  // NEW
+                });                                                   // NEW
+            });                                                       // NEW
+
+          legend.append('text')
+            .attr('x', legendRectSize + legendSpacing)
+            .attr('y', legendRectSize - legendSpacing)
+            .text(function(d) { return d; });
+
+        });
+
+}());
+
+
+
+(function()
+
+{
+
+  var margin = {
+        top: 20,
+        right: 210,
+        bottom: 50,
+        left: 70
+    },
+    outerWidth = 1050,
+    outerHeight = 500,
+    width = outerWidth - margin.left - margin.right,
+    height = outerHeight - margin.top - margin.bottom;
+
+var x = d3.scale.linear()
+    .range([0, width]).nice();
+
+var y = d3.scale.linear()
+    .range([height, 0]).nice();
+
+var xAxis = d3.svg.axis()
+    .scale(x)
+    .orient("bottom")
+    .tickSize(-height);
+
+var yAxis = d3.svg.axis()
+    .scale(y)
+    .orient("left")
+    .tickSize(-width);
+
+var xCat = "perctofvalidvotes",
+    yCat = "perctofregvoters",
+    rCat = "pertofinvalidvotes",
+	distCat = "district",
+    colorCat = "winner";
+
+var labels = {
+    "pertofinvalidvotes": "%Invalid Votes from Total Votes Cast",
+    "perctofregvoters": "%Voter Turn Out",
+    "perctofvalidvotes": "%Valid Votes for Winner from total Cast"
+	"district": "District"
+}
+
+d3.csv("musevenivotepattern.csv", function(data) {
+    data.forEach(function(d) {
+        d.perctofregvoters = +d.perctofregvoters;
+        d.icustay_id = +d.icustay_id;
+        d.perctofvalidvotes = +d.perctofvalidvotes;
+        d.pertofinvalidvotes = +d.pertofinvalidvotes;
+        d.hospital_expire_flag = +d.hospital_expire_flag;
+        d.winner = d.winner;
+    });
+
+    var xMax = d3.max(data, function(d) {
+            return d[xCat];
+        }) * 1.05,
+        xMin = d3.min(data, function(d) {
+            return d[xCat];
+        }),
+        xMin = xMin > 0 ? 0 : xMin,
+        yMax = d3.max(data, function(d) {
+            return d[yCat];
+        }) * 1.05,
+        yMin = d3.min(data, function(d) {
+            return d[yCat];
+        }),
+        yMin = yMin > 0 ? 0 : yMin;
+    x.domain([xMin, xMax]);
+    y.domain([yMin, yMax]);
+
+    var color = d3.scale.category10();
+
+    var tip = d3.tip()
+        .attr("class", "d3-tip")
+        .offset([-10, 0])
+        .html(function(d) {
+            return labels[xCat] + ": " + d[xCat] + "<br>" + labels[yCat] + ": " + d[yCat] + "<br>" + labels[rCat] + ": " + d[rCat]+ "<br>" + labels[distCat] + ": " + d[distCat];
+        });
+
+    var zoomBeh = d3.behavior.zoom()
+        .x(x)
+        .y(y)
+        .scaleExtent([0, 1000])
+        .on("zoom", zoom);
+
+    var svg = d3.select("#scatter")
+        .append("svg")
+        .attr("width", outerWidth)
+        .attr("height", outerHeight)
+        .append("g")
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")")
+        .call(zoomBeh);
+    svg.call(tip);
+    svg.append("rect")
+        .attr("width", width)
+        .attr("height", height);
+    svg.append("g")
+        .classed("x axis", true)
+        .attr("transform", "translate(0," + height + ")")
+        .call(xAxis)
+        .append("text")
+        .classed("label", true)
+        .attr("x", width)
+        .attr("y", margin.bottom - 10)
+        .style("text-anchor", "end")
+        .text("%Valid Votes for Winner from total Cast");
+    svg.append("g")
+        .classed("y axis", true)
+        .call(yAxis)
+        .append("text")
+        .classed("label", true)
+        .attr("transform", "rotate(-90)")
+        .attr("y", -margin.left)
+        .attr("dy", "1.5em")
+        .style("text-anchor", "end")
+        .text("%Voter Turn Out");
+
+    var objects = svg.append("svg")
+        .classed("objects", true)
+        .attr("width", width)
+        .attr("height", height);
+    objects.append("svg:line")
+        .classed("axisLine hAxisLine", true)
+        .attr("x1", 0)
+        .attr("y1", 0)
+        .attr("x2", width)
+        .attr("y2", 0)
+        .attr("transform", "translate(0," + height + ")");
+    objects.append("svg:line")
+        .classed("axisLine vAxisLine", true)
+        .attr("x1", 0)
+        .attr("y1", 0)
+        .attr("x2", 0)
+        .attr("y2", height);
+    objects.selectAll(".dot")
+        .data(data)
+        .enter().append("circle")
+        .classed("dot", true)
+        .attr({
+            r: function(d) {
+                return 4 * Math.sqrt(d[rCat] / Math.PI);
+            },
+            cx: function(d) {
+                return x(d[xCat]);
+            },
+            cy: function(d) {
+                return y(d[yCat]);
+            }
+        })
+    .style("fill", function(d) {
+        return color(d[colorCat]);
+    })
+        .on("mouseover", tip.show)
+        .on("mouseout", tip.hide);
+
+    var legend = svg.selectAll(".legend")
+        .data(color.domain())
+        .enter().append("g")
+        .classed("legend", true)
+        .attr("transform", function(d, i) {
+            return "translate(0," + i * 20 + ")";
+        });
+    legend.append("rect")
+        .attr("x", width + 10)
+        .attr("width", 12)
+        .attr("height", 12)
+        .style("fill", color);
+    legend.on("click", function(type) {
+        // dim all of the icons in legend
+        d3.selectAll(".legend")
+            .style("opacity", 0.1);
+        // make the one selected be un-dimmed
+        d3.select(this)
+            .style("opacity", 1);
+        // select all dots and apply 0 opacity (hide)
+        d3.selectAll(".dot")
+        // .transition()
+        // .duration(500)
+        .style("opacity", 0.0)
+        // filter out the ones we want to show and apply properties
+        .filter(function(d) {
+            return d["winner"] == type;
+        })
+            .style("opacity", 1) // need this line to unhide dots
+        .style("stroke", "black")
+        // apply stroke rule
+        .style("fill", function(d) {
+            if (d.hospital_expire_flag == 1) {
+                return this
+            } else {
+                return "white"
+            };
+        });
+    });
+    legend.append("text")
+        .attr("x", width + 26)
+        .attr("dy", ".65em")
+        .text(function(d) {
+            return d;
+        });
+    d3.select("button.reset").on("click", change)
+    d3.select("button.changexlos").on("click", updateX)
+
+    function change() {
+        xMax = d3.max(data, function(d) {
+            return d[xCat];
+        });
+        xMin = d3.min(data, function(d) {
+            return d[xCat];
+        });
+        zoomBeh.x(x.domain([xMin, xMax])).y(y.domain([yMin, yMax]));
+
+        var svg = d3.select("#scatter").transition();
+        svg.select(".x.axis").duration(750).call(xAxis).select(".label").text(labels[xCat]);
+        objects.selectAll(".dot").transition().duration(1000)
+            .attr({
+                r: function(d) {
+                    return 4 * Math.sqrt(d[rCat] / Math.PI);
+                },
+                cx: function(d) {
+                    return x(d[xCat]);
+                },
+                cy: function(d) {
+                    return y(d[yCat]);
+                }
+            })
+    }
+
+    function zoom() {
+        svg.select(".x.axis").call(xAxis);
+        svg.select(".y.axis").call(yAxis);
+        svg.selectAll(".dot")
+            .attr({
+                cx: function(d) {
+                    return x(d[xCat]);
+                },
+                cy: function(d) {
+                    return y(d[yCat]);
+                }
+            })
+            // .attr("transform", transform);
+    }
+
+    function transform(d) {
+        return "translate(" + x(d[xCat]) + "," + y(d[yCat]) + ")";
+    }
+
+    function updateX() {
+        xCat = "pertofinvalidvotes",
+        yCat = "perctofregvoters",
+        rCat = "perctofvalidvotes",
+        colorCat = "winner";
+        xMax = d3.max(data, function(d) {
+            return d[xCat];
+        }) * 1.05,
+        xMin = d3.min(data, function(d) {
+            return d[xCat];
+        }),
+        xMin = xMin > 0 ? 0 : xMin,
+        yMax = d3.max(data, function(d) {
+            return d[yCat];
+        }) * 1.05,
+        yMin = d3.min(data, function(d) {
+            return d[yCat];
+        }),
+        yMin = yMin > 0 ? 0 : yMin;
+        x.domain([xMin, xMax]);
+        y.domain([yMin, yMax]);
+
+        var zoomBeh = d3.behavior.zoom()
+            .x(x)
+            .y(y)
+            .scaleExtent([0, 1000])
+            .on("zoom", zoom);
+
+        var svg = d3.select("svg").transition();
+        svg.select(".y.axis")
+            .duration(1000)
+            .call(yAxis);
+        svg.select('.x.axis')
+            .duration(1000)
+            .call(xAxis);
+        svg.select('.label')
+            .duration(1000)
+        .attr("x", width)
+            .attr("y", margin.bottom - 10)
+            .style("text-anchor", "end")
+            .text("%Invalid Votes from Total Votes Cast");
+
+        d3.selectAll("circle.dot")
+            .transition()
+            .duration(1000)
+            .attr({
+                r: function(d) {
+                    return 4 * Math.sqrt(d[rCat] / Math.PI);
+                },
+                cx: function(d) {
+                    return x(d[xCat]);
+                },
+                cy: function(d) {
+                    return y(d[yCat]);
+                }
+            })
+    }
+});
+
+
+}());
